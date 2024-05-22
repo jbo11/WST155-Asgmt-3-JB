@@ -1,0 +1,313 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>WST155: Assignment 3</title>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #f0f0f0;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+        margin: 0;
+        cursor: url('images/cursor.cur'), auto;
+    }
+
+    #container {
+        text-align: center;
+    }
+
+    #canvas {
+        border: 2px solid #333;
+        background-color: #fff;
+        display: inline-block;
+        box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+        margin-top: 20px;
+    }
+
+    .btn-container {
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .btn {
+        background-color: #4CAF50;
+        border: none;
+        color: white;
+        padding: 10px 20px;
+        text-align: center;
+        text-decoration: none;
+        display: inline-block;
+        font-size: 16px;
+        margin: 0 10px;
+        cursor: pointer;
+        border-radius: 5px;
+        transition: background-color 0.3s ease;
+    }
+
+    .btn:hover {
+        background-color: #45a049;
+    }
+</style>
+</head>
+<body>
+
+<div id="container">
+    <div class="btn-container">
+        <button id="startBtn" class="btn">Start Battle</button>
+        <button id="stopBtn" class="btn" disabled>Stop Battle</button>
+        <button id="restartBtn" class="btn">Restart Battle</button>
+    </div>
+
+    <canvas id="canvas" width="800" height="600"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    let animation;
+    const images = [];
+    let imagesRemoved = 0;
+
+    class ImageObject {
+        constructor(image, x, y, width, height, dx, dy) {
+            this.image = image;
+            this.x = x;
+            this.y = y;
+            this.width = width;
+            this.height = height;
+            this.dx = dx;
+            this.dy = dy;
+            this.isExploding = false;
+            this.explosionParticles = [];
+            this.hasExploded = false;
+        }
+
+        draw() {
+            ctx.drawImage(this.image, this.x, this.y, this.width, this.height);
+        }
+
+        update() {
+            if (!this.isExploding) {
+                this.x += this.dx;
+                this.y += this.dy;
+
+                if (this.x + this.width > canvas.width || this.x < 0) {
+                    this.dx = -this.dx;
+                }
+
+                if (this.y + this.height > canvas.height || this.y < 0) {
+                    this.dy = -this.dy;
+                }
+
+                this.draw();
+            } else {
+                if (!this.hasExploded) {
+                    this.explosionParticles.forEach((particle, index) => {
+                        particle.update();
+                        if (particle.alpha <= 0) {
+                            this.explosionParticles.splice(index, 1); // Remove faded out particles
+                        }
+                    });
+                    if (this.explosionParticles.length === 0) {
+                        this.hasExploded = true; // Set flag that explosion is completed
+                    }
+                }
+            }
+        }
+
+        isHovering(mouseX, mouseY) {
+            return (
+                mouseX > this.x &&
+                mouseX < this.x + this.width &&
+                mouseY > this.y &&
+                mouseY < this.y + this.height
+            );
+        }
+
+        moveOnHover(mouseX, mouseY) {
+            const speed = 2; // Speed
+            if (this.x < mouseX) {
+                this.dx = Math.abs(this.dx) + speed;
+            } else if (this.x > mouseX) {
+                this.dx = -Math.abs(this.dx) - speed;
+            }
+
+            if (this.y < mouseY) {
+                this.dy = Math.abs(this.dy) + speed;
+            } else if (this.y > mouseY) {
+                this.dy = -Math.abs(this.dy) - speed;
+            }
+        }
+
+        explode() {
+            if (!this.isExploding && !this.hasExploded) { 
+                this.isExploding = true;
+                const numParticles = 30;
+                for (let i = 0; i < numParticles; i++) {
+                    const particleSize = Math.random() * 4 + 1;
+                    const dx = (Math.random() - 0.5) * 6;
+                    const dy = (Math.random() - 0.5) * 6;
+                    const particle = new Particle(this.x, this.y, particleSize, dx, dy, this.color);
+                    this.explosionParticles.push(particle);
+                }
+            }
+        }
+    }
+
+    class Particle {
+        constructor(x, y, size, dx, dy, color) {
+            this.x = x;
+            this.y = y;
+            this.size = size;
+            this.dx = dx;
+            this.dy = dy;
+            this.color = color;
+            this.alpha = 1;
+            this.gravity = 0.1;
+            this.friction = 0.98;
+        }
+
+        draw() {
+            ctx.save();
+            ctx.globalAlpha = this.alpha;
+            ctx.fillStyle = this.color;
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.restore();
+        }
+
+        update() {
+            this.x += this.dx;
+            this.y += this.dy;
+
+            this.dy += this.gravity;
+            this.dx *= this.friction;
+            this.dy *= this.friction;
+
+            this.alpha -= 0.01;
+
+            this.draw();
+        }
+    }
+
+    function init() {
+        const imageCount = 10;
+        const imageWidth = 70;
+        const imageHeight = 70;
+        for (let i = 0; i < imageCount; i++) {
+            const x = Math.random() * (canvas.width - imageWidth);
+            const y = Math.random() * (canvas.height - imageHeight);
+            const dx = (Math.random() - 0.5) * 4;
+            const dy = (Math.random() - 0.5) * 4;
+            const image = new Image();
+            image.src = `images/Virus-${i + 1}.png`;
+            images.push(new ImageObject(image, x, y, imageWidth, imageHeight, dx, dy));
+        }
+    }
+
+    function animate() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    images.forEach(image => {
+        image.update();
+    });
+
+    // Check if all viruses have been removed
+    if (imagesRemoved === images.length) {
+        cancelAnimationFrame(animation); // Stop animation loop
+        setTimeout(() => {
+            showCongratulations();
+        }, 2000);
+    } else {
+        animation = requestAnimationFrame(animate); // Continue animation loop
+    }
+}
+
+
+
+    function showCongratulations() {
+    // Create a <div> element for congratulations message
+    const congratulationsDiv = document.createElement('div');
+    congratulationsDiv.textContent = "Congratulations! All viruses are gone.";
+    congratulationsDiv.style.fontFamily = 'Arial, sans-serif';
+    congratulationsDiv.style.fontSize = '24px';
+    congratulationsDiv.style.color = '#333';
+    congratulationsDiv.style.backgroundColor = '#f0f0f0';
+    congratulationsDiv.style.padding = '20px';
+    congratulationsDiv.style.textAlign = 'center';
+    congratulationsDiv.style.position = 'absolute';
+    congratulationsDiv.style.top = '50%';
+    congratulationsDiv.style.left = '50%';
+    congratulationsDiv.style.transform = 'translate(-50%, -50%)';
+    congratulationsDiv.style.border = '2px solid #4CAF50';
+    congratulationsDiv.style.borderRadius = '10px';
+    congratulationsDiv.style.boxShadow = '0 0 20px rgba(0, 0, 0, 0.2)';
+    congratulationsDiv.style.zIndex = '9999';
+
+
+    document.body.appendChild(congratulationsDiv);
+
+
+    setTimeout(() => {
+        congratulationsDiv.remove();
+    }, 3000);
+}
+
+
+
+    canvas.addEventListener('click', (e) => {
+    const mouseX = e.clientX - canvas.getBoundingClientRect().left;
+    const mouseY = e.clientY - canvas.getBoundingClientRect().top;
+
+    images.forEach(image => {
+        if (image.isHovering(mouseX, mouseY) && !image.hasExploded) {
+            image.explode();
+            imagesRemoved++;
+
+            // Check if all viruses have been removed after each click
+            if (imagesRemoved === images.length) {
+                cancelAnimationFrame(animation); // Stop animation loop
+                showCongratulations();
+            }
+        }
+    });
+});
+
+
+    document.getElementById('startBtn').addEventListener('click', () => {
+        animate();
+        document.getElementById('startBtn').disabled = true;
+        document.getElementById('stopBtn').disabled = false;
+    });
+
+    document.getElementById('stopBtn').addEventListener('click', () => {
+        cancelAnimationFrame(animation);
+        document.getElementById('startBtn').disabled = false;
+        document.getElementById('stopBtn').disabled = true;
+    });
+
+    document.getElementById('restartBtn').addEventListener('click', () => {
+    cancelAnimationFrame(animation);
+    images.forEach(image => {
+        image.hasExploded = false;
+        image.explosionParticles = [];
+    });
+    imagesRemoved = 0;
+    init();
+    animate();
+    document.getElementById('startBtn').disabled = true;
+    document.getElementById('stopBtn').disabled = false;
+});
+
+
+    init();
+</script>
+
+</body>
+</html>
